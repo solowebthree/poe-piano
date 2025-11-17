@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POE Piano 🐼 Multi-Color Sparkle Game</title> 
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <style>
+        /* Custom CSS uses CONFIG variables for core theme colors */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #030312; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        #sparkleCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 10;
+        }
+
+        /* High-contrast message box */
+        #message-box {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            background-color: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 1.5rem 2.5rem;
+            border-radius: 12px;
+            border: 4px solid #ffea00; 
+            text-align: center;
+            box-shadow: 0 6px 25px rgba(255, 234, 0, 0.7);
+        }
+        
+        .pacing-message {
+            color: #ccc;
+            background-color: #12122b;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 1.1rem;
+        }
+        
+        /* Branding Footer */
+        #footer-branding {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            z-index: 20;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+        
+        /* Custom styling for the X Logo representation */
+        .x-logo {
+            font-size: 1.2rem;
+            font-family: 'Inter', sans-serif;
+            font-weight: 900;
+            color: white;
+            line-height: 1;
+            margin-left: 0.5rem;
+        }
+
+        /* --- NEW: SETTINGS MODAL STYLES --- */
+        #settings-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 30;
+            cursor: pointer;
+            font-size: 2rem;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 0.5rem;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+        #settings-button:hover {
+            transform: rotate(90deg);
+        }
+
+        #settings-modal {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 300px;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            padding: 2rem;
+            color: #fff;
+            z-index: 40;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5);
+            transform: translateX(100%);
+            transition: transform 0.4s ease-out;
+        }
+        #settings-modal.open {
+            transform: translateX(0);
+        }
+        .setting-group {
+            margin-bottom: 1.5rem;
+            padding: 0.75rem;
+            border-bottom: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="message-box">
+        <p id="message-text" class="text-3xl font-extrabold text-yellow-300">🎹 POE Piano 🐼 Tap to play the chord!</p>
+        <p class="pacing-message">The screen is divided into six color-toned zones.</p>
+    </div>
+    
+    <div id="settings-button" onclick="toggleSettings()">
+        ⚙️
+    </div>
+
+    <div id="settings-modal">
+        <h2 class="text-2xl font-bold mb-4 text-yellow-300 border-b pb-2">Theme Settings</h2>
+        
+        <div class="setting-group">
+            <label for="bg-color-input" class="block mb-2 font-semibold">Background Color</label>
+            <input type="color" id="bg-color-input" class="w-full h-10 cursor-pointer" oninput="updateSetting('bgColor', this.value)">
+        </div>
+
+        <div class="setting-group">
+            <label for="particle-count-input" class="block mb-2 font-semibold">Particle Count (<span id="particle-count-value">40</span>)</label>
+            <input type="range" id="particle-count-input" min="10" max="100" step="5" class="w-full cursor-pointer" oninput="updateSetting('particleCount', this.value)">
+        </div>
+
+        <div class="setting-group">
+            <label for="trail-length-input" class="block mb-2 font-semibold">Trail Length (Fade)</label>
+            <input type="range" id="trail-length-input" min="5" max="25" step="1" class="w-full cursor-pointer" oninput="updateSetting('fadeAlpha', this.value / 1000)">
+            <p class="text-xs text-gray-400 mt-1">Lower value = longer trails</p>
+        </div>
+
+        <div class="setting-group">
+            <label for="gravity-input" class="block mb-2 font-semibold">Gravity (<span id="gravity-value">0.03</span>)</label>
+            <input type="range" id="gravity-input" min="0" max="10" step="1" class="w-full cursor-pointer" oninput="updateSetting('gravity', this.value / 1000)">
+        </div>
+        
+        <button onclick="toggleSettings()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full">
+            Close Settings
+        </button>
+    </div>
+    
+    <canvas id="sparkleCanvas"></canvas>
+    
+    <div id="footer-branding" class="text-sm text-gray-400">
+        Powered by <a id="brand-link-user" href="#" target="_blank" class="text-blue-400 hover:text-blue-300 transition-colors ml-1">@solowebthree</a>
+        <a id="brand-link-icon" href="#" target="_blank" class="ml-2 inline-block" aria-label="Visit solowebthree on X">
+            <span class="x-logo">X</span> 
+        </a>
+    </div>
+
+
+    <script>
+        
+        // --- ⚙️ CONFIGURATION BLOCK: EASY TO CUSTOMIZE! ⚙️ ---
+        const CONFIG = {
+            // --- UI & BRANDING SETTINGS ---
+            TITLE_TEXT: "🎹 POE Piano 🐼 Tap to play the chord!",
+            SUB_TEXT: "The screen is divided into six color-toned zones.",
+            BRAND_NAME: "@solowebthree",
+            BRAND_LINK: "https://x.com/solowebthree",
+            CANVAS_BG_COLOR: "rgb(3, 3, 18)", // Used to set background and trail color
+            CANVAS_FADE_ALPHA: 0.15, // Lower number = longer, brighter trails
+
+            // --- PARTICLE PHYSICS ---
+            PARTICLE_COUNT: 40,
+            GRAVITY: 0.03,
+            FRICTION: 0.95,
+            PARTICLE_MIN_FORCE: 2,
+            PARTICLE_MAX_FORCE: 6,
+
+            // --- AUDIO SETTINGS ---
+            CHORD_DURATION: '0.5', 
+            PIANO_ENVELOPE: { 
+                attack: 0.02, 
+                decay: 0.6, 
+                sustain: 0.1, 
+                release: 0.5 
+            },
+            DELAY_FEEDBACK: 0.5,
+            DELAY_TIME: "8n", 
+
+            // --- COLOR & TONE ZONES (Must have 6 zones for current logic) ---
+            COORDINATION_ZONES: [
+                { color: '#FF00FF', notes: ['A4', 'C#5', 'E5'] }, 
+                { color: '#00FFFF', notes: ['G4', 'B4', 'D5'] },   
+                { color: '#00FF00', notes: ['F4', 'A4', 'C5'] },   
+                { color: '#FFFF00', notes: ['E4', 'G#4', 'B4'] },  
+                { color: '#FF8800', notes: ['D4', 'F#4', 'A4'] },  
+                { color: '#FF0000', notes: ['C4', 'E4', 'G4'] }    
+            ]
+        };
+        // --- 🛑 END CONFIGURATION BLOCK 🛑 ---
+
+
+        // Global variables 
+        const canvas = document.getElementById('sparkleCanvas');
+        const ctx = canvas.getContext('2d');
+        const messageText = document.getElementById('message-text');
+        const messageSub = document.querySelector('.pacing-message');
+        const brandLinkUser = document.getElementById('brand-link-user');
+        const brandLinkIcon = document.getElementById('brand-link-icon');
+        const settingsModal = document.getElementById('settings-modal');
+
+        // Game State
+        let particles = [];
+        const random = (min, max) => Math.random() * (max - min) + min;
+
+        // Tone.js Setup 
+        let audioContextActive = false;
+        const delay = new Tone.FeedbackDelay(CONFIG.DELAY_TIME, CONFIG.DELAY_FEEDBACK).toDestination();
+        const pianoSynth = new Tone.PolySynth(Tone.Synth, {
+            voice: Tone.Synth,
+            options: { oscillator: { type: 'triangle' }, envelope: CONFIG.PIANO_ENVELOPE }
+        }).connect(delay); 
+
+        /**
+         * @function playSoundRewards
+         */
+        function playSoundRewards(notes) {
+            if (!audioContextActive) return;
+            const safeTime = Tone.now() + 0.001; 
+            pianoSynth.triggerAttackRelease(notes, CONFIG.CHORD_DURATION, safeTime); 
+        }
+
+        // --- PARTICLE CLASS ---
+        class Particle {
+            constructor(x, y, color, vx, vy) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.color = color;
+                this.alpha = 1;
+                this.radius = random(1.5, 3.5);
+                this.decay = random(0.01, 0.03); 
+                this.shine = random(0.1, 0.4);
+                this.tick = 0;
+            }
+
+            update() {
+                this.vx *= CONFIG.FRICTION;
+                this.vy *= CONFIG.FRICTION;
+                this.vy += CONFIG.GRAVITY;
+                
+                this.x += this.vx;
+                this.y += this.vy;
+                this.radius = Math.max(0.5, this.radius + Math.sin(this.tick * this.shine) * 0.1);
+                this.alpha -= this.decay;
+                this.tick++;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+                ctx.fillStyle = this.color;
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        /**
+         * @function launchSparkles
+         */
+        function launchSparkles(x, y, color, notes) {
+            playSoundRewards(notes); 
+
+            const count = CONFIG.PARTICLE_COUNT; 
+            for (let i = 0; i < count; i++) {
+                const angle = i * (Math.PI * 2 / count);
+                const force = random(CONFIG.PARTICLE_MIN_FORCE, CONFIG.PARTICLE_MAX_FORCE);
+                const vx = Math.cos(angle) * force * random(0.5, 1.5);
+                const vy = Math.sin(angle) * force * random(0.5, 1.5);
+                particles.push(new Particle(x, y, color, vx, vy));
+            }
+        }
+        
+        /**
+         * @function handleInteraction
+         */
+        function handleInteraction(event) {
+            // Check if the click was on the footer or settings, and if so, don't launch sparkles
+            if (event.target.closest('#footer-branding') || event.target.closest('#settings-modal') || event.target.closest('#settings-button')) {
+                return; 
+            }
+
+            if (event.type === 'touchstart') {
+                event.preventDefault();
+            }
+
+            const x = event.clientX || (event.touches ? event.touches[0].clientX : canvas.width / 2);
+            const y = event.clientY || (event.touches ? event.touches[0].clientY : canvas.height / 2);
+            
+            const zones = CONFIG.COORDINATION_ZONES;
+            const zoneHeight = canvas.height / zones.length;
+            const zoneIndex = Math.floor(y / zoneHeight);
+            
+            const launchZone = zones[Math.min(zoneIndex, zones.length - 1)];
+
+
+            // 1. Audio Context Activation Logic
+            if (!audioContextActive) {
+                Tone.start().then(() => {
+                    audioContextActive = true;
+                    messageText.textContent = CONFIG.TITLE_TEXT; 
+                    messageSub.textContent = CONFIG.SUB_TEXT;
+                    launchSparkles(x, y, launchZone.color, launchZone.notes);
+
+                }).catch(err => {
+                    console.error("Failed to start Audio Context:", err);
+                    messageText.textContent = 'Error: Audio failed to start.';
+                });
+            } else {
+                // 2. Launch Sparkles on subsequent interactions
+                launchSparkles(x, y, launchZone.color, launchZone.notes);
+            }
+        }
+
+        // --- NEW: SETTINGS FUNCTIONS ---
+
+        /**
+         * @function toggleSettings
+         */
+        window.toggleSettings = function() {
+            settingsModal.classList.toggle('open');
+        }
+
+        /**
+         * @function initializeSettings
+         * Sets initial values of inputs based on CONFIG.
+         */
+        function initializeSettings() {
+            document.getElementById('bg-color-input').value = rgbToHex(CONFIG.CANVAS_BG_COLOR);
+            
+            const particleInput = document.getElementById('particle-count-input');
+            particleInput.value = CONFIG.PARTICLE_COUNT;
+            document.getElementById('particle-count-value').textContent = CONFIG.PARTICLE_COUNT;
+            
+            const trailInput = document.getElementById('trail-length-input');
+            trailInput.value = CONFIG.CANVAS_FADE_ALPHA * 1000;
+            
+            const gravityInput = document.getElementById('gravity-input');
+            gravityInput.value = CONFIG.GRAVITY * 1000;
+            document.getElementById('gravity-value').textContent = CONFIG.GRAVITY;
+        }
+
+        /**
+         * @function updateSetting
+         * Updates the CONFIG object and visible values.
+         */
+        window.updateSetting = function(key, value) {
+            if (key === 'bgColor') {
+                // Background color update
+                CONFIG.CANVAS_BG_COLOR = hexToRgb(value);
+                document.body.style.backgroundColor = CONFIG.CANVAS_BG_COLOR;
+            } else if (key === 'particleCount') {
+                // Particle count update
+                CONFIG.PARTICLE_COUNT = parseInt(value);
+                document.getElementById('particle-count-value').textContent = value;
+            } else if (key === 'fadeAlpha') {
+                // Trail length update
+                CONFIG.CANVAS_FADE_ALPHA = parseFloat(value);
+            } else if (key === 'gravity') {
+                // Gravity update
+                CONFIG.GRAVITY = parseFloat(value);
+                document.getElementById('gravity-value').textContent = CONFIG.GRAVITY;
+            }
+        }
+        
+        // Helper to convert RGB string to Hex for color input
+        function rgbToHex(rgb) {
+            const parts = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+            if (!parts) return "#000000";
+            function hex(x) {
+                return ("0" + parseInt(x).toString(16)).slice(-2);
+            }
+            return "#" + hex(parts[1]) + hex(parts[2]) + hex(parts[3]);
+        }
+
+        // Helper to convert Hex to RGB string for canvas use
+        function hexToRgb(hex) {
+            const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+            hex = hex.replace(shorthandRegex, function(m, r, g, b) {
+                return r + r + g + g + b + b;
+            });
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? `rgb(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)})` : null;
+        }
+
+
+        // --- Main Functions ---
+
+        const resizeCanvas = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        };
+
+        const clearCanvas = () => {
+            const rgbMatch = CONFIG.CANVAS_BG_COLOR.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+            if (!rgbMatch) { 
+                ctx.fillStyle = `rgba(0, 0, 0, ${CONFIG.CANVAS_FADE_ALPHA})`;
+                return;
+            }
+            const r = parseInt(rgbMatch[1]);
+            const g = parseInt(rgbMatch[2]);
+            const b = parseInt(rgbMatch[3]);
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${CONFIG.CANVAS_FADE_ALPHA})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        };
+
+        const animate = () => {
+            requestAnimationFrame(animate);
+            clearCanvas();
+            particles = particles.filter(particle => {
+                particle.update();
+                particle.draw();
+                return particle.alpha > 0;
+            });
+        };
+
+        // --- Event Listeners and Initialization ---
+        
+        function applyBranding() {
+            document.title = CONFIG.TITLE_TEXT;
+            messageText.textContent = CONFIG.TITLE_TEXT;
+            messageSub.textContent = CONFIG.SUB_TEXT;
+            
+            brandLinkUser.textContent = CONFIG.BRAND_NAME;
+            brandLinkUser.href = CONFIG.BRAND_LINK;
+            brandLinkIcon.href = CONFIG.BRAND_LINK;
+
+            document.body.style.backgroundColor = CONFIG.CANVAS_BG_COLOR;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        
+        document.body.addEventListener('click', handleInteraction);
+        document.body.addEventListener('touchstart', handleInteraction);
+
+        window.onload = function () {
+            applyBranding();
+            initializeSettings();
+            resizeCanvas();
+            animate();
+        };
+    </script>
+</body>
+</html>

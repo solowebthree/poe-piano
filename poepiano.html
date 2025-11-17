@@ -43,6 +43,16 @@
             border: 4px solid #ffea00; 
             text-align: center;
             box-shadow: 0 6px 25px rgba(255, 234, 0, 0.7);
+            
+            /* --- NEW: TRANSITION STYLES --- */
+            transition: opacity 1.5s ease-out, visibility 1.5s;
+        }
+        
+        /* --- NEW: CLASS TO HIDE THE MESSAGE BOX --- */
+        #message-box.hidden-message {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none; /* Allows clicks to go through the hidden element */
         }
         
         .pacing-message {
@@ -78,7 +88,7 @@
             margin-left: 0.5rem;
         }
 
-        /* --- NEW: SETTINGS MODAL STYLES --- */
+        /* --- SETTINGS MODAL STYLES --- */
         #settings-button {
             position: fixed;
             top: 20px;
@@ -179,8 +189,8 @@
             SUB_TEXT: "The screen is divided into six color-toned zones.",
             BRAND_NAME: "@solowebthree",
             BRAND_LINK: "https://x.com/solowebthree",
-            CANVAS_BG_COLOR: "rgb(3, 3, 18)", // Used to set background and trail color
-            CANVAS_FADE_ALPHA: 0.15, // Lower number = longer, brighter trails
+            CANVAS_BG_COLOR: "rgb(3, 3, 18)", 
+            CANVAS_FADE_ALPHA: 0.15, 
 
             // --- PARTICLE PHYSICS ---
             PARTICLE_COUNT: 40,
@@ -216,6 +226,7 @@
         // Global variables 
         const canvas = document.getElementById('sparkleCanvas');
         const ctx = canvas.getContext('2d');
+        const messageBox = document.getElementById('message-box');
         const messageText = document.getElementById('message-text');
         const messageSub = document.querySelector('.pacing-message');
         const brandLinkUser = document.getElementById('brand-link-user');
@@ -326,9 +337,19 @@
             if (!audioContextActive) {
                 Tone.start().then(() => {
                     audioContextActive = true;
-                    messageText.textContent = CONFIG.TITLE_TEXT; 
-                    messageSub.textContent = CONFIG.SUB_TEXT;
+                    
+                    // NEW: Update message to a smaller, secondary instruction
+                    messageText.textContent = 'Keep exploring the beautiful color and piano tones!'; 
+                    messageText.classList.remove('text-3xl', 'font-extrabold', 'text-yellow-300');
+                    messageText.classList.add('text-2xl', 'text-pink-300');
+                    messageSub.textContent = 'Settings ⚙️ are available in the top right.';
+                    
                     launchSparkles(x, y, launchZone.color, launchZone.notes);
+                    
+                    // NEW: Fade out the message box after 3 seconds
+                    setTimeout(() => {
+                        messageBox.classList.add('hidden-message');
+                    }, 3000); 
 
                 }).catch(err => {
                     console.error("Failed to start Audio Context:", err);
@@ -340,7 +361,7 @@
             }
         }
 
-        // --- NEW: SETTINGS FUNCTIONS ---
+        // --- SETTINGS FUNCTIONS ---
 
         /**
          * @function toggleSettings
@@ -351,7 +372,6 @@
 
         /**
          * @function initializeSettings
-         * Sets initial values of inputs based on CONFIG.
          */
         function initializeSettings() {
             document.getElementById('bg-color-input').value = rgbToHex(CONFIG.CANVAS_BG_COLOR);
@@ -370,22 +390,17 @@
 
         /**
          * @function updateSetting
-         * Updates the CONFIG object and visible values.
          */
         window.updateSetting = function(key, value) {
             if (key === 'bgColor') {
-                // Background color update
                 CONFIG.CANVAS_BG_COLOR = hexToRgb(value);
                 document.body.style.backgroundColor = CONFIG.CANVAS_BG_COLOR;
             } else if (key === 'particleCount') {
-                // Particle count update
                 CONFIG.PARTICLE_COUNT = parseInt(value);
                 document.getElementById('particle-count-value').textContent = value;
             } else if (key === 'fadeAlpha') {
-                // Trail length update
                 CONFIG.CANVAS_FADE_ALPHA = parseFloat(value);
             } else if (key === 'gravity') {
-                // Gravity update
                 CONFIG.GRAVITY = parseFloat(value);
                 document.getElementById('gravity-value').textContent = CONFIG.GRAVITY;
             }
